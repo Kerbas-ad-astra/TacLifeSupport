@@ -39,6 +39,8 @@ namespace Tac
         private TacGameSettings gameSettings;
         private ButtonWrapper button;
         private SavedGameConfigWindow configWindow;
+        private const string lockName = "TACLS_SpaceCenterLock";
+        private const ControlTypes desiredLock = ControlTypes.KSC_FACILITIES;
 
         public SpaceCenterManager()
         {
@@ -48,6 +50,11 @@ namespace Tac
             button = new ButtonWrapper(new Rect(Screen.width * 0.75f, 0, 32, 32), "ThunderAerospace/TacLifeSupport/Textures/greenIcon",
                 "LS", "TAC Life Support Configuration Window", OnIconClicked, "SpaceCenterIcon");
             configWindow = new SavedGameConfigWindow(globalSettings, gameSettings);
+        }
+
+        void Awake()
+        {
+            this.Log("Awake");
         }
 
         void Start()
@@ -79,9 +86,6 @@ namespace Tac
 
         void Update()
         {
-            const string lockName = "TACLS_SpaceCenterLock";
-            const ControlTypes desiredLock = ControlTypes.KSC_FACILITIES;
-
             if (configWindow.IsVisible() && configWindow.Contains(Event.current.mousePosition))
             {
                 if (InputLockManager.GetControlLock(lockName) != desiredLock)
@@ -114,6 +118,12 @@ namespace Tac
         {
             this.Log("OnDestroy");
             button.Destroy();
+
+            // Make sure we remove our locks
+            if (InputLockManager.GetControlLock(lockName) == desiredLock)
+            {
+                InputLockManager.RemoveControlLock(lockName);
+            }
         }
 
         private void OnIconClicked()

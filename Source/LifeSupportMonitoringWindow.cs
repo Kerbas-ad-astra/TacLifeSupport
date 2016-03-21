@@ -99,24 +99,32 @@ namespace Tac
 
         protected override void DrawWindowContents(int windowId)
         {
+            scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
+            GUILayout.BeginVertical();
+            GUILayout.Space(4);
+
+            double currentTime = Planetarium.GetUniversalTime();
+            var vesselsCopy = new List<KeyValuePair<Guid, VesselInfo>>(gameSettings.knownVessels);
+            vesselsCopy.Sort(new VesselSorter(FlightGlobals.ActiveVessel));
+
             if (FlightGlobals.ready)
             {
-                scrollPosition = GUILayout.BeginScrollView(scrollPosition, scrollStyle);
-                GUILayout.BeginVertical();
-                GUILayout.Space(4);
-
-                double currentTime = Planetarium.GetUniversalTime();
-
-                // Draw the active vessel first
+                // Draw the active vessel first, if any
                 Vessel activeVessel = FlightGlobals.ActiveVessel;
-                if (activeVessel != null)
+                int skipCount = 0;
+                if (activeVessel != null && vesselsCopy.Count > 0)
                 {
-                    if (gameSettings.knownVessels.ContainsKey(activeVessel.id))
+                    var vessel = vesselsCopy[0];
+                    if (FlightGlobals.ActiveVessel.id == vessel.Key)
                     {
-                        DrawVesselInfo(gameSettings.knownVessels[activeVessel.id], currentTime);
+                        DrawVesselInfo(vessel.Value, currentTime);
+
+                        // Skip the active vessel later when drawing the rest of the vessels
+                        skipCount = 1;
                     }
                     else
                     {
+                        // No info cached about the active vessel -- either it has not launched yet, or there is no crew
                         int numCrew = activeVessel.GetCrewCount();
                         GUILayout.Label(activeVessel.vesselName + " (" + numCrew + " crew) [" + activeVessel.vesselType + "]", headerStyle);
                         if (numCrew > 0)
@@ -131,19 +139,23 @@ namespace Tac
                     GUILayout.Space(10);
                 }
 
-                foreach (var entry in gameSettings.knownVessels)
+                foreach (var vessel in vesselsCopy.Skip(skipCount))
                 {
-                    // The active vessel was already done above
-                    if (entry.Key != activeVessel.id)
-                    {
-                        DrawVesselInfo(entry.Value, currentTime);
-                        GUILayout.Space(10);
-                    }
+                    DrawVesselInfo(vessel.Value, currentTime);
+                    GUILayout.Space(10);
                 }
-
-                GUILayout.EndVertical();
-                GUILayout.EndScrollView();
             }
+            else
+            {
+                foreach (var vessel in vesselsCopy)
+                {
+                    DrawVesselInfo(vessel.Value, currentTime);
+                    GUILayout.Space(10);
+                }
+            }
+
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
 
             GUILayout.Space(8);
 
@@ -181,6 +193,46 @@ namespace Tac
             else
             {
                 return labelStyle;
+            }
+        }
+
+        private class VesselSorter : IComparer<KeyValuePair<Guid, VesselInfo>>
+        {
+            private Vessel activeVessel;
+
+            public VesselSorter(Vessel activeVessel)
+            {
+                this.activeVessel = activeVessel;
+            }
+
+            public int Compare(KeyValuePair<Guid, VesselInfo> left, KeyValuePair<Guid, VesselInfo> right)
+            {
+                // Put the active vessel at the top of the list
+                if (activeVessel != null)
+                {
+                    if (left.Key.Equals(activeVessel.id))
+                    {
+                        if (right.Key.Equals(activeVessel.id))
+                        {
+                            // Both sides are the active vessel (i.e. the same vessel)
+                            return 0;
+                        }
+                        else
+                        {
+                            return -1;
+                        }
+                    }
+                    else if (right.Key.Equals(activeVessel.id))
+                    {
+                        return 1;
+                    }
+                }
+
+                // then sort by the shortest time until a resource is depleted
+                double leftShortestTime = Math.Min(left.Value.estimatedTimeFoodDepleted, Math.Min(left.Value.estimatedTimeWaterDepleted, left.Value.estimatedTimeOxygenDepleted));
+                double rightShortestTime = Math.Min(right.Value.estimatedTimeFoodDepleted, Math.Min(right.Value.estimatedTimeWaterDepleted, right.Value.estimatedTimeOxygenDepleted));
+
+                return leftShortestTime.CompareTo(rightShortestTime);
             }
         }
     }

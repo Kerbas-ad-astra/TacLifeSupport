@@ -33,47 +33,7 @@ using UnityEngine;
 
 namespace Tac
 {
-    /*
-     * This gets created when the game loads the Space Center scene. It then checks to make sure
-     * the scenarios have been added to the game (so they will be automatically created in the
-     * appropriate scenes).
-     */
-    [KSPAddon(KSPAddon.Startup.SpaceCentre, false)]
-    public class AddScenarioModules : MonoBehaviour
-    {
-        void Start()
-        {
-            var game = HighLogic.CurrentGame;
-
-            ProtoScenarioModule psm = game.scenarios.Find(s => s.moduleName == typeof(TacLifeSupport).Name);
-            if (psm == null)
-            {
-                this.Log("Adding the scenario module.");
-                psm = game.AddProtoScenarioModule(typeof(TacLifeSupport), GameScenes.SPACECENTER,
-                    GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH);
-            }
-            else
-            {
-                if (!psm.targetScenes.Any(s => s == GameScenes.SPACECENTER))
-                {
-                    psm.targetScenes.Add(GameScenes.SPACECENTER);
-                }
-                if (!psm.targetScenes.Any(s => s == GameScenes.FLIGHT))
-                {
-                    psm.targetScenes.Add(GameScenes.FLIGHT);
-                }
-                if (!psm.targetScenes.Any(s => s == GameScenes.EDITOR))
-                {
-                    psm.targetScenes.Add(GameScenes.EDITOR);
-                }
-                if (!psm.targetScenes.Any(s => s == GameScenes.SPH))
-                {
-                    psm.targetScenes.Add(GameScenes.SPH);
-                }
-            }
-        }
-    }
-
+    [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.SPACECENTER, GameScenes.EDITOR, GameScenes.FLIGHT, GameScenes.TRACKSTATION)]
     public class TacLifeSupport : ScenarioModule
     {
         public static TacLifeSupport Instance { get; private set; }
@@ -101,10 +61,23 @@ namespace Tac
             this.Log("OnAwake in " + HighLogic.LoadedScene);
             base.OnAwake();
 
+            GameEvents.onGameSceneLoadRequested.Add(OnGameSceneLoadRequested);
+
             if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
             {
                 this.Log("Adding SpaceCenterManager");
                 var c = gameObject.AddComponent<SpaceCenterManager>();
+                children.Add(c);
+                /* This does show the window, but only shows one button in the toolbar
+                this.Log("Adding LifeSupportController");
+                var d = gameObject.AddComponent<LifeSupportController>();
+                children.Add(d);
+                */
+            }
+            else if (HighLogic.LoadedScene == GameScenes.TRACKSTATION)
+            {
+                this.Log("Adding LifeSupportController");
+                var c = gameObject.AddComponent<LifeSupportController>();
                 children.Add(c);
             }
             else if (HighLogic.LoadedScene == GameScenes.FLIGHT)
@@ -113,7 +86,7 @@ namespace Tac
                 var c = gameObject.AddComponent<LifeSupportController>();
                 children.Add(c);
             }
-            else if (HighLogic.LoadedScene == GameScenes.EDITOR || HighLogic.LoadedScene == GameScenes.SPH)
+            else if (HighLogic.LoadedScene == GameScenes.EDITOR)
             {
                 this.Log("Adding EditorController");
                 var c = gameObject.AddComponent<EditorController>();
@@ -154,6 +127,11 @@ namespace Tac
             globalNode.Save(globalConfigFilename);
 
             this.Log("OnSave: " + gameNode + "\n" + globalNode);
+        }
+
+        private void OnGameSceneLoadRequested(GameScenes gameScene)
+        {
+            this.Log("Game scene load requested: " + gameScene);
         }
 
         void OnDestroy()
